@@ -25,11 +25,8 @@ end
       cnt = cnt+1
      end
   end
-  #ch = coords[1:2, n2*n1-n2+1:n2*n1]
-  #coords[1:2, n2*n1-n2+1:n2*n1] = coords[1:2, n2*n1-2*n1+1:n2*n1-n2]
-  #coords[1:2, n2*n1-2*n2+1:n2*n1-n2] = ch
-  #r = 10e-2*rand(2, size(coords)[2])
-  #coords  = coords + r  #"random" pertubation
+  r = 1./(4*n1)*rand(size(coords)[1], size(coords)[2])
+  coords  = coords + r  #"random" pertubation of grid
   return coords
   end
 

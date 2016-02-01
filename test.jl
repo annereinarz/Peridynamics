@@ -2,13 +2,19 @@ using msh
 using PyPlot
 using ODE
 
+###########################################################################################
+#                     INPUT                                                               # 
+###########################################################################################
+
 n = 10 #number of particles will be n*n
 N = n*n
 #set up mesh
 m = msh.Mesh(n,n)
-#msh.plotMesh(m,"b")
-npull = 10 #number of elements being pulled at a constant speed
-nhold = 10 #number of elements being held at their initial position
+npull = n #number of elements being pulled at a constant speed
+nhold = n #number of elements being held at their initial position
+
+#Set time interval [0,maxT]
+maxT = 4 
 
 #Set up matrix of spring constants
 global K
@@ -28,36 +34,37 @@ for i = N-npull+1:N
   K[i,:] *= 10
   K[:,i] *= 10
 end
+
+##################################################################################################
+
 #count the number of bonds each element has
-global nbonds
-nbonds = N*ones(N)
+global nbonds = Dict{Float64, Array{Float64,2}}()
+nbonds[0.] = N*ones(N,1)
 
 c1 = [4 2]  #choose speed in x and y direction
 function f(t,x)
-  println(t)
   global K
-  #Create "forcing" term
-  B = zeros(2*(N-npull-nhold),1)
   H = ones(size(K)[1],size(K)[2])
-  xh  = [m.coords[1,1:nhold]' m.coords[2,1:nhold]'; hcat(x[1:N-npull-nhold], x[N-npull-nhold+1:2*(N-npull-nhold)]); (c1[1]*t+m.coords[1,N-npull+1:N])' (c1[2]*t+m.coords[2,N-npull+1:N])']'
+  xh  = [m.coords[1,1:nhold]' m.coords[2,1:nhold]';
+         hcat(x[1:N-npull-nhold], x[N-npull-nhold+1:2*(N-npull-nhold)]);
+         (c1[1]*t+m.coords[1,N-npull+1:N])' (c1[2]*t+m.coords[2,N-npull+1:N])']'
   for i = 1:N
     for j = i+1:N
       if norm(xh[:,i]-xh[:,j]) > 10 
         H[i,j] = H[j,i] = 0
       end
       #make particles repulse each other/try to enforce order
-      #TODO confuses the ode solver for some reason
+      #confuses the ode solver for some reason
       #if norm(xh[:,i] - xh[:,j]) < 0.1 && H[i,j] > 0
-      #  H[i,j] = -1*H[i,j]
+      #  H[i,j] = -H[i,j]
       #  H[j,i] = H[i,j]
       #end
     end 
   end
   K = K.*H
   #recalculate the number of bonds
-  nbonds_t = sum((K .!= 0),2)
   global nbonds
-  nbonds = [nbonds nbonds_t]
+  nbonds[t] = sum(K.!=0, 2)
 
   #Create stiffness matrix
   A = zeros(N-npull-nhold,N-npull-nhold)
@@ -67,6 +74,8 @@ function f(t,x)
       if(i!=j) A[i,j] = K[i+nhold,j+nhold] end
     end
   end
+  #Create "forcing" term
+  B = zeros(2*(N-npull-nhold),1)
   for i = 1:N-npull-nhold
     B[i]     = sum((c1[1]*t + m.coords[1,N-npull+1:N]).*K[i+nhold,N-npull+1:N]) + sum(K[i+nhold, 1:nhold].*m.coords[1,1:nhold])
     B[i+N-npull-nhold] = sum((c1[2]*t + m.coords[2,N-npull+1:N]).*K[i+nhold,N-npull+1:N]) + sum(K[i+nhold, 1:nhold].*m.coords[2,1:nhold])
@@ -76,31 +85,28 @@ function f(t,x)
 end
 
 
-
-maxT = 4 
-y0 = [m.coords[1,nhold+1:N-npull]'; m.coords[2,nhold+1:N-npull]'; zeros(2*(N-npull-nhold))]
+#Solve system of second order ODE using ode45
+y0 = [m.coords[1,nhold+1:N-npull]'; m.coords[2,nhold+1:N-npull]'; zeros(2*(N-npull-nhold))]  #initial conditions
+                                                      #initial positions given by mesh, initial speed set to zero
 tout,yout  = ode45(f, y0,[0:0.1:maxT;])
 ys = hcat(yout...)'
 @printf "Number of timesteps: %d\n" size(tout)[1]
 
 #Plot position of particles at time step
-#count number of elements with broken bonds
-broken = [nbonds .< 50]
 cnt  = 1
 minh = minimum(tout[2:end] - tout[1:end-1])
 diff = maximum(tout[2:end] - tout[1:end-1])/minh 
-@printf "Difference in time step size %d \n" diff
 if diff > 5 i_step = floor(diff/5) end
 for tstep = 1:i_step:size(tout)[1] - 1
-  println(tstep)
   currenth = tout[tstep+1] - tout[tstep]
   for j =1:i_step:ceil(currenth/minh)
-    broken_t = broken[:,tstep]
+    broken_t = (nbonds[tout[tstep]] .< 50)[:,1]
     yh  = [m.coords[1,1:nhold]' m.coords[2,1:nhold]';
            vcat(ys[tstep, 1:N-npull-nhold], ys[tstep, N-npull-nhold+1:2*(N-npull-nhold)])';
            (c1[1]*tout[tstep]+m.coords[1,N-npull+1:N])' (c1[2]*tout[tstep]+m.coords[2,N-npull+1:N])']
+    plot([-5,20],[-5,25], markersize = 0, linestyle = "None") #sloppy way of setting axis sizes 
     plot(yh[ broken_t,1], yh[ broken_t,2], marker="o", markersize=10, color = "r", linestyle = "None")
-    #plot(yh[~broken_t,1], yh[~broken_t,2], marker="o", markersize=10, color = "b", linestyle = "None")
+    plot(yh[~broken_t,1], yh[~broken_t,2], marker="o", markersize=10, color = "b", linestyle = "None")
     savefig(string("Plots/plot", cnt))
     clf()
     cnt = cnt+1

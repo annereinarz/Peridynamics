@@ -8,5 +8,7 @@ in the plots folder.
 The parameters of the test can be changed in test.jl
 
 If the PyPlot and ODE libraries are not previously installed:
+using Pkg
+Pkg.update()
 Pkg.add("PyPlot")
-Pkg.add("ODE")
+Pkg.add("DifferentialEquations")

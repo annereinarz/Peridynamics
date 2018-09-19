@@ -4,7 +4,7 @@ using PyPlot
 
 export plotMesh
 
-type Mesh
+struct Mesh
     coords
 
     function Mesh(n1,n2)
@@ -25,13 +25,13 @@ end
       cnt = cnt+1
      end
   end
-  r = 1./(4*n1)*rand(size(coords)[1], size(coords)[2])
+  r = 1.0/(4*n1)*rand(size(coords)[1], size(coords)[2])
   coords  = coords + r  #"random" pertubation of grid
   return coords
   end
 
 
-  function plotMesh(m::Mesh,c::ASCIIString)
+  function plotMesh(m::Mesh,c::String)
 
     #Plot coordinates
     for i = 1:size(m.coords)[2]

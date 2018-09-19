@@ -12,3 +12,5 @@ using Pkg
 Pkg.update()
 Pkg.add("PyPlot")
 Pkg.add("DifferentialEquations")
+
+This version is tested with julia v1.0.0
